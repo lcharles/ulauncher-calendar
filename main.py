@@ -53,6 +53,7 @@ class CalendarExtension(Extension):
     def __init__(self):
         super().__init__()
         self.store = CalendarStore()
+        self.store.warm_up()
         self.state = load_state()
         self._parser = None
         self.subscribe(KeywordQueryEvent, KeywordQueryEventListener())
@@ -130,6 +131,10 @@ def message(name, description='', icon=ICON, on_enter=None):
                                on_enter=on_enter or DoNothingAction())
 
 
+def failure_items(extension):
+    return [message(f, 'The event was not saved', ERROR_ICON) for f in extension.store.pop_failures()]
+
+
 def read_errors(errors):
     """A warning row when some calendars couldn't be read, so missing events don't look like free time."""
     if not errors:
@@ -140,37 +145,37 @@ def read_errors(errors):
 class KeywordQueryEventListener(EventListener):
 
     def on_event(self, event, extension):
-        text = (event.get_argument() or '').strip()
-        now = dt.datetime.now()
         try:
-            query = extension.parser.parse(text, now=now)
-            if query.calendar == '' and not query.title and query.when.empty:
-                return RenderResultListAction(self.list_calendars(event, extension))
-
-            calendars = extension.calendars()
-            if query.calendar:
-                calendars = [c for c in calendars if c.matches(query.calendar)]
-                if not calendars:
-                    hidden = [c.name for c in extension.calendars(include_excluded=True)
-                              if c.excluded and c.matches(query.calendar)]
-                    return RenderResultListAction([message(
-                        f'No calendar matches “#{query.calendar}”',
-                        f'“{hidden[0]}” is excluded in the preferences' if hidden
-                        else 'Type “cal #” to list your calendars', ERROR_ICON)])
-            if not calendars:
-                return RenderResultListAction([message(
-                    'No calendars found', '; '.join(extension.store.errors) or
-                    'Add one in GNOME Calendar or GNOME Online Accounts', ERROR_ICON)])
-
-            if query.is_create:
-                items = self.create_items(query, calendars, extension, now)
-            else:
-                items = self.list_items(query, calendars, extension, now)
-            items = read_errors(extension.store.errors) + items
+            items = self.results(event, extension)
         except Exception as e:
             logger.exception('Calendar query failed')
             items = [message('Calendar error', str(e), ERROR_ICON)]
-        return RenderResultListAction(items)
+        # failed saves and unreadable calendars show on every view, so missing events don't look like free time
+        return RenderResultListAction(failure_items(extension) + read_errors(extension.store.errors) + items)
+
+    def results(self, event, extension):
+        text = (event.get_argument() or '').strip()
+        now = dt.datetime.now()
+        query = extension.parser.parse(text, now=now)
+        if query.calendar == '' and not query.title and query.when.empty:
+            return self.list_calendars(event, extension)
+
+        calendars = extension.calendars()
+        if query.calendar:
+            calendars = [c for c in calendars if c.matches(query.calendar)]
+            if not calendars:
+                hidden = [c.name for c in extension.calendars(include_excluded=True)
+                          if c.excluded and c.matches(query.calendar)]
+                return [message(
+                    f'No calendar matches “#{query.calendar}”',
+                    f'“{hidden[0]}” is excluded in the preferences' if hidden
+                    else 'Type “cal #” to list your calendars', ERROR_ICON)]
+        if not calendars:
+            return [message('No calendars found', 'Add one in GNOME Calendar or GNOME Online Accounts', ERROR_ICON)]
+
+        if query.is_create:
+            return self.create_items(query, calendars, extension, now)
+        return self.list_items(query, calendars, extension, now)
 
     @staticmethod
     def list_items(query, calendars, extension, now):
@@ -302,6 +307,10 @@ class ItemEnterEventListener(EventListener):
         extension.state['last_calendar'] = cal.uid
         save_state(extension.state)
         when = format_span(start, end, data['all_day'], dt.date.today())
+        if uid is None:
+            return message(f'Adding “{data["title"]}” to {cal.name}…',
+                           f'{when} — the calendar isn’t answering yet: the event is saved as soon as it does',
+                           color_icon(cal.color), HideWindowAction())
         return ExtensionResultItem(
             icon=color_icon(cal.color),
             name=f'Added “{data["title"]}” to {cal.name}',
