@@ -130,6 +130,13 @@ def message(name, description='', icon=ICON, on_enter=None):
                                on_enter=on_enter or DoNothingAction())
 
 
+def read_errors(errors):
+    """A warning row when some calendars couldn't be read, so missing events don't look like free time."""
+    if not errors:
+        return []
+    return [message('Some calendars couldn’t be read: events may be missing', '; '.join(errors), ERROR_ICON)]
+
+
 class KeywordQueryEventListener(EventListener):
 
     def on_event(self, event, extension):
@@ -159,6 +166,7 @@ class KeywordQueryEventListener(EventListener):
                 items = self.create_items(query, calendars, extension, now)
             else:
                 items = self.list_items(query, calendars, extension, now)
+            items = read_errors(extension.store.errors) + items
         except Exception as e:
             logger.exception('Calendar query failed')
             items = [message('Calendar error', str(e), ERROR_ICON)]

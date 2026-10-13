@@ -178,10 +178,13 @@ class CalendarStore:
             except Exception as e:
                 logger.warning('Could not list events of %r: %s', cal.name, e)
                 self.errors.append(f'{cal.name}: {e}')
+                self._clients.pop(cal.uid, None)    # e.g. EDS restarted: reconnect on the next query
                 continue
             # EDS also returns events that merely touch the range (e.g. all-day ending at its start)
             found = [e for e in found if e is not None and _overlaps(e, start, end)]
-            self._events[key] = (time.monotonic(), found)
+            now = time.monotonic()
+            self._events = {k: v for k, v in self._events.items() if now - v[0] < self.event_ttl}
+            self._events[key] = (now, found)
             out.extend(found)
         out.sort(key=Event.sort_key)
         return out

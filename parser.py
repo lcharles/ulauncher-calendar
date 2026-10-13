@@ -84,9 +84,11 @@ class ParsedQuery:
         """Concrete (start, end, all_day). All-day ends are exclusive dates."""
         w = self.when
         day = w.date or today
-        last = w.end_date or day
         if w.start is None or w.all_day:
+            # "trip next week", "ski weekend": the whole span, not just its first day
+            last = w.end_date or day + dt.timedelta(days=w.span_days - 1)
             return day, last + dt.timedelta(days=1), True
+        last = w.end_date or day
         start = dt.datetime.combine(day, w.start)
         if w.end is not None:
             end = dt.datetime.combine(last, w.end)
@@ -124,8 +126,8 @@ def _add_months(day, months):
 
 
 def _next_occurrence(today, month, day):
-    """Date for day/month without a year: the next one, today included."""
-    for year in (today.year, today.year + 1):
+    """Date for day/month without a year: the next one, today included (29/02 can be 4+ years off)."""
+    for year in range(today.year, today.year + 9):
         try:
             candidate = dt.date(year, month, day)
         except ValueError:
@@ -210,7 +212,7 @@ class Parser:
 
     # --- markers ----------------------------------------------------------
 
-    _CALENDAR_RE = re.compile(r'(?:(?<=\s)|^)#(?P<name>[^\s\d#]\S*)?(?=\s|$)')
+    _CALENDAR_RE = re.compile(r'(?:(?<=\s)|^)#(?P<name>(?!\d+(?:\s|$))[^\s#]\S*)?(?=\s|$)')   # "#12" alone stays in the title
     _MARKER_RE = re.compile(r'::|(?:(?<=\s)|^)@')
 
     def _split_markers(self, text):

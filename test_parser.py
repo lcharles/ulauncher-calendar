@@ -233,5 +233,24 @@ class ParserTest(unittest.TestCase):
         self.assertEqual(q.span(today), (D(2026, 10, 16), D(2026, 10, 17), True))
 
 
+    def test_spans_are_created_whole(self):
+        today = NOW.date()
+        self.assertEqual(self.p.parse('trip next week', now=NOW).span(today),
+                         (D(2026, 10, 19), D(2026, 10, 26), True))
+        self.assertEqual(self.p.parse('ski weekend', now=NOW).span(today),
+                         (D(2026, 10, 17), D(2026, 10, 19), True))
+        # with a time it is one timed event, on the first day
+        self.assertEqual(self.p.parse('standup next week 9am', now=NOW).span(today)[:2],
+                         (dt.datetime(2026, 10, 19, 9), dt.datetime(2026, 10, 19, 10)))
+
+    def test_leap_day(self):
+        self.check('party 29/02', 'party', D(2028, 2, 29))
+        self.check('party 29 feb', 'party', D(2028, 2, 29))
+
+    def test_calendar_selector(self):
+        self.check('milk #2026-Goals', 'milk', calendar='2026-Goals')
+        self.check('#Q4 report', 'report', calendar='Q4')
+        self.check('fix bug #12', 'fix bug #12', calendar=None)
+
 if __name__ == '__main__':
     unittest.main()
