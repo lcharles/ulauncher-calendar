@@ -1,7 +1,7 @@
 {
   "required_api_version": "^2.0.0",
   "name": "Calendar",
-  "description": "List events across your Evolution Data Server calendars and create new ones",
+  "description": "List events across your Evolution Data Server calendars and create new ones in plain English, French, German, Spanish or Italian",
   "developer_name": "Lucas",
   "icon": "images/icon.png",
   "options": {
@@ -37,12 +37,81 @@
       "default_value": "60"
     },
     {
+      "id": "language",
+      "type": "select",
+      "name": "Language",
+      "description": "Language of dates and times you type (\"tomorrow 3pm\", \"demain 15h\", \"morgen 15 Uhr\"). Automatic follows your desktop's language.",
+      "default_value": "auto",
+      "options": [
+        {
+          "value": "auto",
+          "text": "Automatic"
+        },
+        {
+          "value": "en",
+          "text": "English"
+        },
+        {
+          "value": "fr",
+          "text": "Français"
+        },
+        {
+          "value": "de",
+          "text": "Deutsch"
+        },
+        {
+          "value": "es",
+          "text": "Español"
+        },
+        {
+          "value": "it",
+          "text": "Italiano"
+        }
+      ]
+    },
+    {
+      "id": "language2",
+      "type": "select",
+      "name": "Second language",
+      "description": "Also understand this language; the first one wins when a word means different things in both",
+      "default_value": "en",
+      "options": [
+        {
+          "value": "none",
+          "text": "None"
+        },
+        {
+          "value": "en",
+          "text": "English"
+        },
+        {
+          "value": "fr",
+          "text": "Français"
+        },
+        {
+          "value": "de",
+          "text": "Deutsch"
+        },
+        {
+          "value": "es",
+          "text": "Español"
+        },
+        {
+          "value": "it",
+          "text": "Italiano"
+        }
+      ]
+    },
+    {
       "id": "date_order",
       "type": "select",
       "name": "Date order",
       "description": "How to read numeric dates like 04/10",
       "default_value": "DMY",
-      "options": ["DMY", "MDY"]
+      "options": [
+        "DMY",
+        "MDY"
+      ]
     }
   ]
 }

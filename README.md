@@ -1,7 +1,8 @@
 # Calendar for Ulauncher
 
 List upcoming events across all your calendars and create new ones by typing them in plain
-English or French, e.g. `cal lunch with Bob tomorrow 12:30`.
+language, e.g. `cal lunch with Bob tomorrow 12:30` or `cal Zahnarzt morgen um 15 Uhr`. It understands
+English, French, German, Spanish and Italian, one or two of them at a time.
 
 Calendars come from Evolution Data Server: GNOME Calendar's local calendars, and Google or
 CalDAV accounts added in *Settings → Online Accounts*.
@@ -32,16 +33,26 @@ CalDAV accounts added in *Settings → Online Accounts*.
 
 Enter on an event opens it in GNOME Calendar, and Alt+Enter copies it.
 
-What the date parser understands, with examples:
+What the date parser understands, with English examples:
 
 - **Dates:** `today`, `tomorrow`, `fri`, `next friday` (the Friday of next week), `next week`,
   `weekend`, `in 3 days`, `14/10`, `14 oct`, `2026-10-14`, `14-18 oct`
 - **Times:** `3pm`, `15:00`, `15h30`, `noon`, `at 3` (1 to 7 without am/pm means afternoon),
   `in 2 hours`, ranges like `9-10am` and `from 9 to 11`, durations like `for 1h30`, `all day`
-- **French:** `demain`, `vendredi prochain`, `semaine prochaine`, `dans 3 jours`, `le 1er novembre`,
-  `du 20 au 23 octobre`, `à 14h`, `midi`, `de 9h à 11h`, `pendant 1h30`, `toute la journée`
-- **Anything else** can go after `@`, e.g. `review @ morgen 14:00`. That part is read by dateparser
-  if it is installed.
+- **Numbers** work in every language: `2026-10-14`, `14/10`, `14.10.`, `15:30`, `15h30`.
+
+The same kinds of phrases work in the other languages:
+
+| Language | Examples |
+|---|---|
+| Français | `demain`, `vendredi prochain`, `semaine prochaine`, `dans 3 jours`, `le 1er novembre`, `du 20 au 23 octobre`, `à 14h`, `midi`, `de 9h à 11h`, `pendant 1h30`, `toute la journée` |
+| Deutsch | `morgen`, `übermorgen`, `nächsten Mittwoch`, `nächste Woche`, `in 3 Tagen`, `am 14. Oktober`, `vom 20. bis 23. Oktober`, `um 15 Uhr`, `von 9 bis 11 Uhr`, `für 2 Stunden`, `ganztägig` |
+| Español | `mañana`, `pasado mañana`, `el próximo miércoles`, `la semana que viene`, `en 3 días`, `el 14 de octubre`, `del 20 al 23 de octubre`, `a las 15:00`, `de 9 a 11`, `durante 2 horas`, `todo el día` |
+| Italiano | `domani`, `dopodomani`, `mercoledì prossimo`, `la prossima settimana`, `tra 3 giorni`, `il 14 ottobre`, `dal 20 al 23 ottobre`, `alle 15`, `dalle 9 alle 11`, `per 2 ore`, `tutto il giorno` |
+
+Only the languages chosen in the preferences are read, so their words don't eat into titles in
+another language. Anything else can go after `@`, e.g. `review @ morgen 14:00`: that part is read
+by dateparser if it is installed, in the chosen languages first and then in any language.
 
 A date without a year means its next occurrence. New events use your system time zone.
 
@@ -51,6 +62,9 @@ A date without a year means its next occurrence. New events use your system time
 - **Excluded calendars**: comma-separated names of calendars to ignore (`cal #` shows the names).
 - **Days ahead**: how far `cal` alone looks (7 days).
 - **Default duration (minutes)**: the length of events given only a start time (60).
+- **Language** and **Second language**: which languages dates and times are typed in. *Automatic*
+  follows your desktop's language (English if it isn't one of the five), and the second language
+  defaults to English. When a word means different things in both, the first language wins.
 - **Date order**: how to read `04/10`: day first (DMY) or month first (MDY).
 
 ## Troubleshooting

@@ -11,6 +11,7 @@ accounts from GNOME Online Accounts, ...) and creates new ones.
                                     followed by what is already planned that day
     cal review 3pm :: notes      -> "::" adds a description
     cal standup mon 9am #work    -> "#word" restricts to calendars matching "word"
+    cal réunion demain 14h       -> dates in the one or two languages chosen in the preferences
     cal #                        -> list calendars (Alt+Enter copies a name for the exclusion preference)
 
 See parser.py for everything the date/time parser understands.
@@ -18,6 +19,7 @@ See parser.py for everything the date/time parser understands.
 
 import datetime as dt
 import logging
+import os
 import shutil
 import subprocess
 
@@ -33,6 +35,7 @@ from ulauncher.api.shared.action.HideWindowAction import HideWindowAction
 from ulauncher.api.shared.action.DoNothingAction import DoNothingAction
 
 from calendars import CalendarStore, color_icon, day_label, format_span, load_state, save_state
+import langs
 from parser import Parser
 
 logger = logging.getLogger(__name__)
@@ -64,9 +67,21 @@ class CalendarExtension(Extension):
     @property
     def parser(self):
         order = self.preferences.get('date_order') or 'DMY'
-        if self._parser is None or self._parser.date_order != order:
-            self._parser = Parser(order)
+        languages = self.languages()
+        if self._parser is None or (self._parser.date_order, self._parser.languages) != (order, languages):
+            self._parser = Parser(order, languages)
         return self._parser
+
+    def languages(self):
+        """The one or two selected language codes, "auto" being the desktop's language."""
+        codes = []
+        for key in ('language', 'language2'):
+            code = (self.preferences.get(key) or '').strip().lower()
+            if code == 'auto':
+                code = desktop_language()
+            if code in langs.AVAILABLE and code not in codes:
+                codes.append(code)
+        return tuple(codes) or ('en',)
 
     def excluded(self):
         return [e.strip() for e in (self.preferences.get('excluded_calendars') or '').split(',') if e.strip()]
@@ -91,6 +106,15 @@ class CalendarExtension(Extension):
     def last_used_first(self, calendars):
         last = self.state.get('last_calendar')
         return sorted(calendars, key=lambda c: c.uid != last)
+
+
+def desktop_language():
+    """Two-letter code of the session's language if there is a pack for it, else English."""
+    for var in ('LANGUAGE', 'LC_ALL', 'LC_MESSAGES', 'LANG'):
+        for value in (os.environ.get(var) or '').split(':'):
+            if value[:2].lower() in langs.AVAILABLE:
+                return value[:2].lower()
+    return 'en'
 
 
 def open_action(event_id, summary, when):
