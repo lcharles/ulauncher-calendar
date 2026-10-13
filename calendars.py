@@ -23,6 +23,11 @@ from gi.repository import EDataServer, ECal, ICalGLib
 
 logger = logging.getLogger(__name__)
 
+# wait_for_connected_seconds for connect_sync: 0 would wait forever for the backend to go
+# online (e.g. a Google list after an EDS restart); -1 returns at once and reads use the
+# local copy until the backend has synced.
+NO_WAIT = 0xFFFFFFFF
+
 CACHE_DIR = Path(os.environ.get('XDG_CACHE_HOME', Path.home() / '.cache')) / 'ulauncher-calendar'
 STATE_FILE = Path(os.environ.get('XDG_STATE_HOME', Path.home() / '.local' / 'state')) / 'ulauncher-calendar' / 'state.json'
 
@@ -135,7 +140,7 @@ class CalendarStore:
             client = self._clients.get(uid)
             if client is None:
                 try:
-                    client = ECal.Client.connect_sync(source, ECal.ClientSourceType.EVENTS, 0, None)
+                    client = ECal.Client.connect_sync(source, ECal.ClientSourceType.EVENTS, NO_WAIT, None)
                 except Exception as e:
                     logger.warning('Calendar %r unavailable: %s', name, e)
                     self.errors.append(f'{name}: {e}')
