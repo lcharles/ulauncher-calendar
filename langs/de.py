@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Lucas Charles
 """Deutsch."""
 
 # Months only count next to a day number ("14. Mai"), so "Mai" alone stays a word.

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Lucas Charles
 """Run with: /usr/bin/python3 -m unittest test_parser   (from this folder)"""
 
 import datetime as dt

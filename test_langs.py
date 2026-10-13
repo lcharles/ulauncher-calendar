@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Lucas Charles
 """Language packs: German, Spanish, Italian, and how languages combine.
 
 Run with: /usr/bin/python3 -m unittest test_langs   (from this folder)

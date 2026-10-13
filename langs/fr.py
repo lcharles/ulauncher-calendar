@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Lucas Charles
 """Français."""
 
 # Months only count next to a day number, so "mars" or "mai" alone stay words.

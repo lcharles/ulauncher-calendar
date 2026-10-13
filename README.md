@@ -19,6 +19,17 @@ CalDAV accounts added in *Settings → Online Accounts*.
 - Optional: GNOME Calendar, to open events (otherwise Enter copies them), and `python3-dateparser`,
   for dates in other languages after `@`.
 
+## Install
+
+In Ulauncher, open *Preferences → Extensions → Add extension* and paste:
+
+```
+https://github.com/lcharles/ulauncher-calendar
+```
+
+Ulauncher puts it in `~/.local/share/ulauncher/extensions/com.github.lcharles.ulauncher-calendar`, the
+"extension's folder" mentioned below.
+
 ## Usage
 
 | Type | To |
@@ -75,3 +86,7 @@ A date without a year means its next occurrence. New events use your system time
 - **Events changed on your phone or the web don't show yet:** Evolution Data Server syncs online
   calendars on its own, about every 30 minutes. GNOME Calendar's *Synchronize Calendars* syncs now.
 - After installing or updating the extension, restart Ulauncher.
+
+## License
+
+GPL-3.0-or-later. See [LICENSE](LICENSE).
