@@ -1,0 +1,48 @@
+{
+  "required_api_version": "^2.0.0",
+  "name": "Calendar",
+  "description": "List events across your Evolution Data Server calendars and create new ones",
+  "developer_name": "Lucas",
+  "icon": "images/icon.png",
+  "options": {
+    "query_debounce": 0.1
+  },
+  "preferences": [
+    {
+      "id": "keyword",
+      "type": "keyword",
+      "name": "Calendar",
+      "description": "Keyword to list and create events",
+      "default_value": "cal"
+    },
+    {
+      "id": "excluded_calendars",
+      "type": "input",
+      "name": "Excluded calendars",
+      "description": "Comma-separated calendar names to ignore entirely (type \"cal #\" to see the names)",
+      "default_value": ""
+    },
+    {
+      "id": "days_ahead",
+      "type": "input",
+      "name": "Days ahead",
+      "description": "How many days \"cal\" lists when no date is given",
+      "default_value": "7"
+    },
+    {
+      "id": "default_duration",
+      "type": "input",
+      "name": "Default duration (minutes)",
+      "description": "Length of new events when only a start time is given",
+      "default_value": "60"
+    },
+    {
+      "id": "date_order",
+      "type": "select",
+      "name": "Date order",
+      "description": "How to read numeric dates like 04/10",
+      "default_value": "DMY",
+      "options": ["DMY", "MDY"]
+    }
+  ]
+}
