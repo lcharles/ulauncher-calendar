@@ -132,6 +132,7 @@ class ParserTest(unittest.TestCase):
         self.check('friday 6pm drinks', 'drinks', D(2026, 10, 16), T(18))
         self.check('standup mon 9-9:15am', 'standup', D(2026, 10, 19), T(9), T(9, 15))
         self.check('dentist on 20/10 at 8:45', 'dentist', D(2026, 10, 20), T(8, 45))
+        self.check('meeting wed 14 oct 9am', 'meeting', D(2026, 10, 14), T(9))     # weekday restating the date
 
     # --- markers
     def test_quotes_protect_title(self):
@@ -150,6 +151,64 @@ class ParserTest(unittest.TestCase):
         q = self.p.parse('review @ demain', now=NOW)
         self.assertEqual(q.when.date, D(2026, 10, 14))
         self.assertIsNone(q.unparsed)
+
+    # --- French, with or without "@"
+    def test_french_dates(self):
+        self.check('réunion demain', 'réunion', D(2026, 10, 14))
+        self.check("bilan aujourd'hui", 'bilan', D(2026, 10, 13))
+        self.check('bilan aujourd’hui', 'bilan', D(2026, 10, 13))
+        self.check('apéro ce soir', 'apéro', D(2026, 10, 13))
+        self.check('fête après-demain', 'fête', D(2026, 10, 15))
+        self.check('fête apres demain', 'fête', D(2026, 10, 15))
+        self.check('réunion mercredi', 'réunion', D(2026, 10, 14))
+        self.check('réunion ce mercredi', 'réunion', D(2026, 10, 14))
+        self.check('réunion mercredi prochain', 'réunion', D(2026, 10, 21))   # like "next wednesday"
+        self.check('réunion lundi', 'réunion', D(2026, 10, 19))
+        self.check('rando dimanche', 'rando', D(2026, 10, 18))
+        self.check('voyage dans 3 jours', 'voyage', D(2026, 10, 16))
+        self.check('voyage dans deux semaines', 'voyage', D(2026, 10, 27))
+        self.check('réunion le 14 octobre', 'réunion', D(2026, 10, 14))
+        self.check('réunion le 1er novembre', 'réunion', D(2026, 11, 1))
+        self.check('réunion 3 février 2027', 'réunion', D(2027, 2, 3))
+        self.check('réunion 15 aout', 'réunion', D(2027, 8, 15))
+        self.check('semaine prochaine', '', D(2026, 10, 19), span_days=7)
+        self.check('la semaine prochaine', '', D(2026, 10, 19), span_days=7)
+        self.check('cette semaine', '', D(2026, 10, 13), span_days=6)
+        self.check('ce week-end', '', D(2026, 10, 17), span_days=2)
+        self.check('le week-end prochain', '', D(2026, 10, 24), span_days=2)
+        self.check('vacances du 20 au 23 octobre', 'vacances', D(2026, 10, 20), end_date=D(2026, 10, 23))
+        self.check('stage lundi au vendredi', 'stage', D(2026, 10, 19), end_date=D(2026, 10, 23))
+        self.check('mars attacks', 'mars attacks')
+        self.check('mer du nord', 'mer du nord')
+
+    def test_french_times(self):
+        self.check('réunion à 14h', 'réunion', None, T(14))
+        self.check('réunion 14 h', 'réunion', None, T(14))
+        self.check('réunion 14h00', 'réunion', None, T(14))
+        self.check('réunion 14 h 30', 'réunion', None, T(14, 30))
+        self.check('réunion à 14 heures', 'réunion', None, T(14))
+        self.check('déjeuner à midi', 'déjeuner', None, T(12))
+        self.check('feu d’artifice à minuit', 'feu d’artifice', None, T(0))
+        self.check('appel dans 2 heures', 'appel', D(2026, 10, 13), T(12))
+        self.check('appel dans 30 min', 'appel', D(2026, 10, 13), T(10, 30))
+        self.check('cours de 9h à 11h', 'cours', None, T(9), T(11))
+        self.check('cours entre 9h et 11h', 'cours', None, T(9), T(11))
+        self.check('cours 9h-11h', 'cours', None, T(9), T(11))
+        self.check('sport 18h pendant 1h30', 'sport', None, T(18), duration=dt.timedelta(minutes=90))
+        self.check('sport 18h pour 45 min', 'sport', None, T(18), duration=dt.timedelta(minutes=45))
+        self.check('séminaire demain toute la journée', 'séminaire', D(2026, 10, 14), all_day=True)
+        self.check('pause café', 'pause café')
+        self.check('salle à manger', 'salle à manger')
+
+    def test_french_combined(self):
+        self.check('réunion mercredi 14h', 'réunion', D(2026, 10, 14), T(14))
+        self.check('réunion @ mercredi 14h', 'réunion', D(2026, 10, 14), T(14))
+        self.check('réunion @ mercredi à 14h', 'réunion', D(2026, 10, 14), T(14))
+        self.check('réunion @ mercredi prochain 14h', 'réunion', D(2026, 10, 21), T(14))
+        self.check('réunion @ jeudi prochain', 'réunion', D(2026, 10, 22))
+        self.check('réunion @ lundi de 14h à 16h', 'réunion', D(2026, 10, 19), T(14), T(16))
+        self.check('dentiste le 20/10 à 8h45', 'dentiste', D(2026, 10, 20), T(8, 45))
+        self.check('rdv mercredi 14 octobre à 9h30', 'rdv', D(2026, 10, 14), T(9, 30))
 
     def test_description_and_calendar(self):
         q = self.check('review 3pm :: bring slides #work', 'review', None, T(15))

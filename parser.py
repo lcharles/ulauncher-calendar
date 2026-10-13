@@ -9,19 +9,28 @@ title; whatever is left is the title. An empty title means "list events".
     lunch with Bob tomorrow 12:30          -> "lunch with Bob", tomorrow 12:30-13:30
     standup mon 9-9:15am #work             -> "standup", next Monday, in calendars matching "work"
     "Friday release" party fri 6pm for 3h  -> quotes keep "Friday release" in the title
-    review @ demain 14h :: bring slides    -> after "@" everything is date/time (falls back to dateparser)
+    réunion mercredi prochain de 14h à 16h -> French works the same way, with or without "@"
+    review @ morgen 14:00 :: bring slides  -> after "@" everything is date/time (other languages
+                                              fall back to dateparser)
     tomorrow                               -> no title: list tomorrow's events
 
+English and French are understood natively:
 Recognised dates:  today, tomorrow, day after tomorrow, yesterday, mon..sunday,
                    this/next <weekday>, this/next week, (next) weekend, in 3 days/weeks/months,
-                   14/10, 14.10.2026, 2026-10-14, 14 oct, oct 14th 2026
+                   14/10, 14.10.2026, 2026-10-14, 14 oct, oct 14th 2026, wed 14 oct
+                   aujourd'hui, ce soir, demain, après-demain, hier, lundi..dimanche,
+                   ce/<jour> prochain, cette semaine, semaine prochaine, ce week-end,
+                   week-end prochain, dans 3 jours/semaines/mois, le 1er novembre,
+                   du 20 au 23 octobre, lundi au vendredi
 Recognised times:  3pm, 3:30pm, 15:00, 15h, 15h30, noon, midnight, at 3, in 2 hours,
                    ranges (9-10am, 14:00-15:30, 2pm to 4pm, from 9 to 11, 14h-16h),
                    durations (for 2h, for 45 min, for 1h30), all day
+                   à 14h, 14 h 30, 14 heures, midi, minuit, dans 2 heures,
+                   de 9h à 11h, entre 9h et 11h, pendant 1h30, pour 45 min, toute la journée
 
 Semantics worth knowing:
   - "friday" is the coming Friday (today if it is Friday);
-    "next friday" is the Friday of next week (weeks start on Monday).
+    "next friday" / "vendredi prochain" is the Friday of next week (weeks start on Monday).
   - A date without a year is the next occurrence of it (today included).
   - "at 1".."at 7" without am/pm is read as afternoon.
 """
@@ -36,20 +45,34 @@ MONTHS = {
     'apr': 4, 'april': 4, 'may': 5, 'jun': 6, 'june': 6, 'jul': 7, 'july': 7,
     'aug': 8, 'august': 8, 'sep': 9, 'sept': 9, 'september': 9,
     'oct': 10, 'october': 10, 'nov': 11, 'november': 11, 'dec': 12, 'december': 12,
+    # French (months only count next to a day number, so "mars" or "mai" alone stay words)
+    'janvier': 1, 'janv': 1, 'février': 2, 'fevrier': 2, 'févr': 2, 'fevr': 2, 'mars': 3,
+    'avril': 4, 'avr': 4, 'mai': 5, 'juin': 6, 'juillet': 7, 'juil': 7, 'août': 8, 'aout': 8,
+    'septembre': 9, 'octobre': 10, 'novembre': 11, 'décembre': 12, 'decembre': 12, 'déc': 12,
 }
-# "sun" and "sat" are deliberately left out: too common as plain words.
+# "sun" and "sat" are deliberately left out: too common as plain words (and so are
+# the French abbreviations: "mer", "jeu", "sam", ...).
 WEEKDAYS = {
     'mon': 0, 'monday': 0, 'tue': 1, 'tues': 1, 'tuesday': 1,
     'wed': 2, 'wednesday': 2, 'thu': 3, 'thur': 3, 'thurs': 3, 'thursday': 3,
     'fri': 4, 'friday': 4, 'saturday': 5, 'sunday': 6,
+    'lundi': 0, 'mardi': 1, 'mercredi': 2, 'jeudi': 3, 'vendredi': 4, 'samedi': 5, 'dimanche': 6,
 }
 NUMBER_WORDS = {'a': 1, 'an': 1, 'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5,
-                'six': 6, 'seven': 7, 'eight': 8, 'nine': 9, 'ten': 10}
+                'six': 6, 'seven': 7, 'eight': 8, 'nine': 9, 'ten': 10,
+                'un': 1, 'une': 1, 'deux': 2, 'trois': 3, 'quatre': 4, 'cinq': 5,
+                'sept': 7, 'huit': 8, 'neuf': 9, 'dix': 10}
 
 _MONTH_RE = '|'.join(sorted(MONTHS, key=len, reverse=True))
 _WEEKDAY_RE = '|'.join(sorted(WEEKDAYS, key=len, reverse=True))
-_NUM_RE = r'\d+|' + '|'.join(NUMBER_WORDS)
+_NUM_RE = r'\d+|' + '|'.join(sorted(NUMBER_WORDS, key=len, reverse=True))
 _AMPM = r'[ap]\.?m\.?'
+_ORD = r'(?:st|nd|rd|th|er)?'                     # 1st, 2nd, 1er
+_AT = r'(?:\b(?:at|à)\s+)?'
+# "wed 14 oct" / "mercredi 14 octobre": the weekday just restates the date
+_WD_PREFIX = rf'(?:\b(?:{_WEEKDAY_RE})\b\.?,?\s+)?'
+_HOURS = r'h|hrs?|hours?|heures?'
+_MINUTES = r'm|mins?|minutes?'
 
 HOLE = '\x00'          # replaces recognised text so neighbours don't merge
 QUOTE = '\x01'         # wraps placeholders for quoted text
@@ -253,8 +276,8 @@ class Parser:
                 pos = m.start() + 3
         return when, text
 
-    _RANGE_SEP = re.compile(r'\s*(?:-|–|—|\bto\b|\buntil\b|\btill\b|\bthrough\b|\bthru\b)\s*', re.I)
-    _BARE_DAY = re.compile(r'(?P<d>\d{1,2})(?:st|nd|rd|th)?(?![\w:./])', re.I)
+    _RANGE_SEP = re.compile(r'\s*(?:-|–|—|\bto\b|\buntil\b|\btill\b|\bthrough\b|\bthru\b|\bau\b)\s*', re.I)
+    _BARE_DAY = re.compile(rf'(?P<d>\d{{1,2}}){_ORD}(?![\w:./])', re.I)
 
     def _extend_date_range(self, text, pos, when, now):
         """After a date, swallow "- <date>" / "to <date>" as the end of a multi-day range."""
@@ -296,7 +319,8 @@ class Parser:
 
     @staticmethod
     def _clean(text):
-        text = re.sub(rf'\b(?:on|at|from|for|by|between)\s*(?={HOLE})', ' ', text, flags=re.I)
+        text = re.sub(rf'\b(?:on|at|from|for|by|between|le|à|de|du|pour|pendant|entre)\s*(?={HOLE})',
+                      ' ', text, flags=re.I)
         text = text.replace(HOLE, ' ')
         text = ' '.join(text.split())
         return text.strip(' ,;:-–—')
@@ -341,12 +365,14 @@ class Parser:
             return wrap
 
         # Durations go first so "1.5h" or "1h30" are never mistaken for dates/times.
-        @rule(rf'\bfor\s+(?P<h>{_NUM_RE})\s*(?:h|hrs?|hours?)\s*(?:and\s+)?(?P<m>\d{{1,2}})\s*(?:m|mins?|minutes?)?(?!\w)', ['duration'])
+        FOR = r'\b(?:for|pendant|pour|durant)\s+'
+
+        @rule(rf'{FOR}(?P<h>{_NUM_RE})\s*(?:{_HOURS})\s*(?:and\s+|et\s+)?(?P<m>\d{{1,2}})\s*(?:{_MINUTES})?(?!\w)', ['duration'])
         def _(m, w, today, now):
             w.duration = dt.timedelta(hours=_number(m['h']), minutes=int(m['m']))
             return True
 
-        @rule(r'\bfor\s+(?P<n>\d+(?:[.,]\d+)?|an?|one|two|three|four|five|six)\s*(?P<u>h|hrs?|hours?|m|mins?|minutes?)(?!\w)', ['duration'])
+        @rule(rf'{FOR}(?P<n>\d+(?:[.,]\d+)?|an?|one|two|three|four|five|six|une?|deux|trois|quatre|cinq)\s*(?P<u>{_HOURS}|{_MINUTES})(?!\w)', ['duration'])
         def _(m, w, today, now):
             n = m['n'].replace(',', '.')
             n = float(n) if n[0].isdigit() else _number(n)
@@ -354,12 +380,12 @@ class Parser:
             w.duration = dt.timedelta(**{unit: n})
             return w.duration > dt.timedelta(0)
 
-        @rule(r'\bfor\s+half\s+an?\s+hour\b', ['duration'])
+        @rule(rf'\bfor\s+half\s+an?\s+hour\b|{FOR}une\s+demi[\s-]heure\b', ['duration'])
         def _(m, w, today, now):
             w.duration = dt.timedelta(minutes=30)
             return True
 
-        @rule(r'\ball[\s-]?day\b', ['all_day'])
+        @rule(r'\ball[\s-]?day\b|\btoute\s+la\s+journ[ée]e\b|\bjourn[ée]e\s+enti[èe]re\b', ['all_day'])
         def _(m, w, today, now):
             w.all_day = True
             return True
@@ -371,13 +397,13 @@ class Parser:
             w.date = _make_date(m['y'], m['mo'], m['d'], today)
             return w.date is not None
 
-        @rule(r'(?:\bon\s+)?\b(?P<a>\d{1,2})[./](?P<b>\d{1,2})(?:[./](?P<y>\d{4}|\d{2}))?\.?(?![\w./:])', ['date'])
+        @rule(rf'(?:\bon\s+)?{_WD_PREFIX}\b(?P<a>\d{{1,2}})[./](?P<b>\d{{1,2}})(?:[./](?P<y>\d{{4}}|\d{{2}}))?\.?(?![\w./:])', ['date'])
         def _(m, w, today, now):
             day, month = (m['a'], m['b']) if self.date_order == 'DMY' else (m['b'], m['a'])
             w.date = _make_date(m['y'], month, day, today)
             return w.date is not None
 
-        @rule(rf'(?:\b(?:on|from)\s+)?\b(?P<d1>\d{{1,2}})(?:st|nd|rd|th)?\s*(?:-|–|to)\s*(?P<d2>\d{{1,2}})(?:st|nd|rd|th)?\s+(?:of\s+)?(?P<mo>{_MONTH_RE})\b\.?(?:,?\s+(?P<y>\d{{4}})\b)?', ['date'])
+        @rule(rf'(?:\b(?:on|from|du)\s+)?\b(?P<d1>\d{{1,2}}){_ORD}\s*(?:-|–|\bto\b|\bau\b)\s*(?P<d2>\d{{1,2}}){_ORD}\s+(?:of\s+)?(?P<mo>{_MONTH_RE})\b\.?(?:,?\s+(?P<y>\d{{4}})\b)?', ['date'])
         def _(m, w, today, now):
             month = MONTHS[m['mo'].lower()]
             start = _make_date(m['y'], month, m['d1'], today)
@@ -387,60 +413,62 @@ class Parser:
             w.date, w.end_date, w.span_days = start, end, (end - start).days + 1
             return True
 
-        @rule(rf'(?:\bon\s+)?(?:the\s+)?\b(?P<d>\d{{1,2}})(?:st|nd|rd|th)?\s+(?:of\s+)?(?P<mo>{_MONTH_RE})\b\.?(?:,?\s+(?P<y>\d{{4}})\b)?', ['date'])
+        @rule(rf'(?:\bon\s+)?{_WD_PREFIX}(?:the\s+)?\b(?P<d>\d{{1,2}}){_ORD}\s+(?:of\s+)?(?P<mo>{_MONTH_RE})\b\.?(?:,?\s+(?P<y>\d{{4}})\b)?', ['date'])
         def _(m, w, today, now):
             w.date = _make_date(m['y'], MONTHS[m['mo'].lower()], m['d'], today)
             return w.date is not None
 
-        @rule(rf'(?:\bon\s+)?\b(?P<mo>{_MONTH_RE})\.?\s+(?:the\s+)?(?P<d>\d{{1,2}})(?:st|nd|rd|th)?\b(?!:)(?:,?\s+(?P<y>\d{{4}})\b)?', ['date'])
+        @rule(rf'(?:\bon\s+)?{_WD_PREFIX}\b(?P<mo>{_MONTH_RE})\.?\s+(?:the\s+)?(?P<d>\d{{1,2}}){_ORD}\b(?!:)(?:,?\s+(?P<y>\d{{4}})\b)?', ['date'])
         def _(m, w, today, now):
             w.date = _make_date(m['y'], MONTHS[m['mo'].lower()], m['d'], today)
             return w.date is not None
 
-        @rule(rf'\bin\s+(?P<n>{_NUM_RE})\s+(?P<u>days?|weeks?|months?)\b', ['date'])
+        @rule(rf'\b(?:in|dans)\s+(?P<n>{_NUM_RE})\s+(?P<u>days?|weeks?|months?|jours?|semaines?|mois)\b', ['date'])
         def _(m, w, today, now):
             n, unit = _number(m['n']), m['u'].lower()
-            if unit.startswith('month'):
+            if unit.startswith(('month', 'mois')):
                 w.date = _add_months(today, n)
             else:
-                w.date = today + dt.timedelta(days=n * (7 if unit.startswith('week') else 1))
+                w.date = today + dt.timedelta(days=n * (7 if unit.startswith(('week', 'semaine')) else 1))
             return True
 
-        @rule(r'\b(?:the\s+)?day\s+after\s+tomorrow\b', ['date'])
+        @rule(r'\b(?:the\s+)?day\s+after\s+tomorrow\b|\bapr[eè]s[\s-]demain\b', ['date'])
         def _(m, w, today, now):
             w.date = today + dt.timedelta(days=2)
             return True
 
-        @rule(r'\b(?P<word>today|tonight|tomorrow|tmrw|tmr|yesterday)\b', ['date'])
+        @rule(r"\b(?P<word>today|tonight|tomorrow|tmrw|tmr|yesterday|aujourd['’]hui|ce\s+soir|demain|hier)\b", ['date'])
         def _(m, w, today, now):
-            offset = {'yesterday': -1, 'today': 0, 'tonight': 0}.get(m['word'].lower(), 1)
+            word = m['word'].lower()
+            offset = -1 if word in ('yesterday', 'hier') else 1 if word in ('tomorrow', 'tmrw', 'tmr', 'demain') else 0
             w.date = today + dt.timedelta(days=offset)
             return True
 
-        @rule(r'\b(?P<which>this|next)\s+week\b', ['date'])
+        @rule(r'\b(?:(?P<which>this|next)\s+week|cette\s+semaine|(?:la\s+)?semaine\s+(?P<fr_next>prochaine))\b', ['date'])
         def _(m, w, today, now):
             monday = today - dt.timedelta(days=today.weekday())
-            if m['which'].lower() == 'next':
+            if (m['which'] or '').lower() == 'next' or m['fr_next']:
                 w.date, w.span_days = monday + dt.timedelta(days=7), 7
             else:
                 w.date, w.span_days = today, 7 - today.weekday()
             return True
 
-        @rule(r'(?:\bon\s+)?\b(?:(?P<which>this|next)\s+)?(?:the\s+)?weekend\b', ['date'])
+        @rule(r'(?:\bon\s+)?\b(?:(?P<which>this|next|ce|le)\s+)?(?:the\s+)?week[\s-]?end\b(?:\s+(?P<fr_next>prochain)\b)?', ['date'])
         def _(m, w, today, now):
             if today.weekday() == 6:
                 saturday = today - dt.timedelta(days=1)
             else:
                 saturday = today + dt.timedelta(days=5 - today.weekday())
-            if (m['which'] or '').lower() == 'next':
+            if (m['which'] or '').lower() == 'next' or m['fr_next']:
                 saturday += dt.timedelta(days=7)
             w.date, w.span_days = max(saturday, today), (saturday + dt.timedelta(days=2) - max(saturday, today)).days
             return True
 
-        @rule(rf'(?:\bon\s+)?\b(?:(?P<which>this|next|coming)\s+)?(?P<day>{_WEEKDAY_RE})\b\.?', ['date'])
+        # "mercredi prochain" is read like "next wednesday": the one of next week
+        @rule(rf'(?:\bon\s+)?\b(?:(?P<which>this|next|coming|ce)\s+)?(?P<day>{_WEEKDAY_RE})\b\.?(?:\s+(?P<fr_next>prochain)\b)?', ['date'])
         def _(m, w, today, now):
             target = WEEKDAYS[m['day'].lower()]
-            if (m['which'] or '').lower() == 'next':
+            if (m['which'] or '').lower() == 'next' or m['fr_next']:
                 monday_next = today + dt.timedelta(days=7 - today.weekday())
                 w.date = monday_next + dt.timedelta(days=target)
             else:
@@ -449,15 +477,15 @@ class Parser:
 
         # --- times ---
 
-        @rule(rf'\bin\s+(?P<n>{_NUM_RE})\s*(?P<u>h|hrs?|hours?|m|mins?|minutes?)(?!\w)', ['time', 'date'])
+        @rule(rf'\b(?:in|dans)\s+(?P<n>{_NUM_RE})\s*(?P<u>{_HOURS}|{_MINUTES})(?!\w)', ['time', 'date'])
         def _(m, w, today, now):
             unit = 'minutes' if m['u'].lower().startswith('m') else 'hours'
             at = (now + dt.timedelta(**{unit: _number(m['n'])})).replace(second=0, microsecond=0)
             w.date, w.start = at.date(), at.time()
             return True
 
-        @rule(rf'(?:\b(?P<from>from|between)\s+)?\b(?P<h1>\d{{1,2}})(?:(?P<s1>[:h.])(?P<m1>\d{{2}}))?\s*(?P<a1>{_AMPM}|h)?'
-              rf'\s*(?:-|–|—|\bto\b|\buntil\b|\btill\b|\band\b)\s*'
+        @rule(rf'(?:\b(?P<from>from|between|de|entre)\s+)?\b(?P<h1>\d{{1,2}})(?:(?P<s1>[:h.])(?P<m1>\d{{2}}))?\s*(?P<a1>{_AMPM}|h)?'
+              rf"\s*(?:-|–|—|\bto\b|\buntil\b|\btill\b|\band\b|\bà\b|\bet\b|\bjusqu['’]à\b)\s*"
               rf'(?P<h2>\d{{1,2}})(?:(?P<s2>[:h.])(?P<m2>\d{{2}}))?\s*(?P<a2>{_AMPM}|h)?(?![\w:/])', ['time', 'duration'])
         def _(m, w, today, now):
             explicit = m['from'] or m['a1'] or m['a2'] or (m['s1'] and m['s1'] != '.') or (m['s2'] and m['s2'] != '.')
@@ -467,7 +495,7 @@ class Parser:
             if not explicit and not dotted:
                 return False
             sep = m.group().lower()
-            if re.search(r'\band\b', sep) and (m['from'] or '').lower() != 'between':
+            if re.search(r'\b(?:and|et)\b', sep) and (m['from'] or '').lower() not in ('between', 'entre'):
                 return False
             a1 = m['a1'] if m['a1'] and m['a1'].lower() != 'h' else None
             a2 = m['a2'] if m['a2'] and m['a2'].lower() != 'h' else None
@@ -482,25 +510,27 @@ class Parser:
             w.start, w.end = start, end
             return True
 
-        @rule(rf'(?:\bat\s+)?\b(?P<h>\d{{1,2}})(?:[:h.](?P<m>\d{{2}}))?\s*(?P<a>{_AMPM})(?!\w)', ['time'])
+        @rule(rf'{_AT}\b(?P<h>\d{{1,2}})(?:[:h.](?P<m>\d{{2}}))?\s*(?P<a>{_AMPM})(?!\w)', ['time'])
         def _(m, w, today, now):
             w.start = _to24(int(m['h']), int(m['m'] or 0), m['a'])
             return w.start is not None
 
-        @rule(r'(?:\bat\s+)?\b(?P<h>\d{1,2})(?:[:h](?P<m>\d{2})|h)(?![\w:])', ['time'])
+        # 15:30, 15h, 15h30, 15 h 30, 15 heures
+        @rule(rf'{_AT}\b(?P<h>\d{{1,2}})(?::(?P<m>\d{{2}})|\s*(?:h|heures?)(?:\s*(?P<m2>\d{{2}}))?)(?![\w:])', ['time'])
         def _(m, w, today, now):
+            minute = m['m'] or m['m2']
             # a bare "2h" is more likely a duration than 2 in the morning
-            if m['m'] is None and int(m['h']) < 6:
+            if minute is None and int(m['h']) < 6:
                 return False
-            w.start = _to24(int(m['h']), int(m['m'] or 0), None)
+            w.start = _to24(int(m['h']), int(minute or 0), None)
             return w.start is not None
 
-        @rule(r'(?:\bat\s+)?\b(?P<word>noon|midday|midnight)\b', ['time'])
+        @rule(rf'{_AT}\b(?P<word>noon|midday|midnight|midi|minuit)\b', ['time'])
         def _(m, w, today, now):
-            w.start = dt.time(0, 0) if m['word'].lower() == 'midnight' else dt.time(12, 0)
+            w.start = dt.time(0, 0) if m['word'].lower() in ('midnight', 'minuit') else dt.time(12, 0)
             return True
 
-        @rule(r'\bat\s+(?P<h>\d{1,2})(?![\w:./%])', ['time'])
+        @rule(r'\b(?:at|à)\s+(?P<h>\d{1,2})(?![\w:./%])', ['time'])
         def _(m, w, today, now):
             hour = int(m['h'])
             if not 0 <= hour <= 23:
