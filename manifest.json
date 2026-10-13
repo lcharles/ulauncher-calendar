@@ -2,7 +2,7 @@
   "required_api_version": "^2.0.0",
   "name": "Calendar",
   "description": "List events across your Evolution Data Server calendars and create new ones in plain English, French, German, Spanish or Italian",
-  "developer_name": "Lucas",
+  "developer_name": "lcharles",
   "icon": "images/icon.png",
   "options": {
     "query_debounce": 0.1
