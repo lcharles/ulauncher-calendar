@@ -7,6 +7,12 @@ English, French, German, Spanish and Italian, one or two of them at a time.
 Calendars come from Evolution Data Server: GNOME Calendar's local calendars, and Google or
 CalDAV accounts added in *Settings → Online Accounts*.
 
+<p>
+<img src="screenshots/calendar-upcoming.png" width="420" alt="cal: the coming week">
+<img src="screenshots/calendar-add-en.png" width="420" alt="cal Pick up Hugo friday 4:30pm for 30 min">
+<img src="screenshots/calendar-add-fr.png" width="420" alt="cal Dîner chez Léa samedi 20h">
+</p>
+
 ## Requirements
 
 - Ulauncher 5 (extension API 2)

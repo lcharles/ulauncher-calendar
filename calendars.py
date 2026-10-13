@@ -261,7 +261,7 @@ def format_span(start, end, all_day, today):
 
 
 def color_icon(color):
-    """Path to a PNG dot in the calendar's colour (cached)."""
+    """Path to a PNG dot in the calendar's colour (cached); the extension's icon if it can't be drawn."""
     color = (color or '#888888').strip()
     if not (color.startswith('#') and len(color) in (4, 7)):
         color = '#888888'
@@ -269,19 +269,23 @@ def color_icon(color):
         color = '#' + ''.join(c * 2 for c in color[1:])
     path = CACHE_DIR / 'colors' / f'{color[1:].lower()}.png'
     if not path.exists():
-        import cairo
-        path.parent.mkdir(parents=True, exist_ok=True)
-        size = 64
-        surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, size, size)
-        ctx = cairo.Context(surface)
-        r, g, b = (int(color[i:i + 2], 16) / 255 for i in (1, 3, 5))
-        ctx.arc(size / 2, size / 2, size * 0.36, 0, 6.2832)
-        ctx.set_source_rgb(r, g, b)
-        ctx.fill_preserve()
-        ctx.set_source_rgba(0, 0, 0, 0.25)
-        ctx.set_line_width(2)
-        ctx.stroke()
-        surface.write_to_png(str(path))
+        try:
+            import cairo
+            path.parent.mkdir(parents=True, exist_ok=True)
+            size = 64
+            surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, size, size)
+            ctx = cairo.Context(surface)
+            r, g, b = (int(color[i:i + 2], 16) / 255 for i in (1, 3, 5))
+            ctx.arc(size / 2, size / 2, size * 0.36, 0, 6.2832)
+            ctx.set_source_rgb(r, g, b)
+            ctx.fill_preserve()
+            ctx.set_source_rgba(0, 0, 0, 0.25)
+            ctx.set_line_width(2)
+            ctx.stroke()
+            surface.write_to_png(str(path))
+        except Exception:          # malformed colour, unwritable cache, ...
+            logger.warning('Could not draw a colour icon for %r', color, exc_info=True)
+            return str(Path(__file__).parent / 'images' / 'icon.png')
     return str(path)
 
 
